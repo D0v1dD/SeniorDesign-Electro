@@ -2,16 +2,13 @@ package com.example.myapplication;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.Toast;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -23,19 +20,28 @@ import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
 import com.example.myapplication.databinding.ActivityMainBinding;
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
 
-import java.io.IOException;
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
     private AppBarConfiguration appBarConfiguration;
     private ActivityMainBinding binding;
-    private MediaRecorder mediaRecorder;
-    private String outputFilePath;
+    private AudioRecord audioRecord;
     private static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
     private boolean permissionToRecordAccepted = false;
-    private ProgressBar audioLevelIndicator;
+    private LineChart audioChart;
+    private ArrayList<Entry> audioData;
+    private LineDataSet dataSet;
+    private LineData lineData;
     private Handler handler;
+    private boolean isRecording = false;
+    private static final int SAMPLE_RATE = 44100;
+    private int bufferSize;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,101 +56,80 @@ public class MainActivity extends AppCompatActivity {
         appBarConfiguration = new AppBarConfiguration.Builder(navController.getGraph()).build();
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
 
-        // Request permissions
-        ActivityCompat.requestPermissions(this,
-                new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                REQUEST_RECORD_AUDIO_PERMISSION);
+        // Permission check
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    REQUEST_RECORD_AUDIO_PERMISSION);
+        } else {
+            permissionToRecordAccepted = true;
+        }
 
-        // Initialize MediaRecorder and output file path
-        mediaRecorder = new MediaRecorder();
-        outputFilePath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/baseline_audio.3gp";
-        audioLevelIndicator = findViewById(R.id.audio_level_indicator);
+        // Initialize chart and audio monitoring
+        audioChart = findViewById(R.id.audio_chart);
+
+        audioData = new ArrayList<>();
+        dataSet = new LineDataSet(audioData, "Audio Levels");
+        lineData = new LineData(dataSet);
+        audioChart.setData(lineData);
         handler = new Handler();
 
-        binding.fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (permissionToRecordAccepted) {
-                    recordAudioForTwoSeconds();
-                } else {
-                    Toast.makeText(MainActivity.this, "Recording permissions are not granted", Toast.LENGTH_LONG).show();
-                }
+        binding.fab.setOnClickListener(view -> {
+            if (permissionToRecordAccepted) {
+                startAudioRecording();
+            } else {
+                Toast.makeText(MainActivity.this, "Recording permissions are not granted", Toast.LENGTH_LONG).show();
             }
         });
     }
 
-    private void recordAudioForTwoSeconds() {
-        try {
-            Toast.makeText(this, "Starting recording...", Toast.LENGTH_SHORT).show();
-            Log.d("MainActivity", "Recording started");
+    private void startAudioRecording() {
+        bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+        audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT, bufferSize);
+        audioRecord.startRecording();
+        isRecording = true;
 
-            mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-            mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
-            mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-            mediaRecorder.setOutputFile(outputFilePath);
-
-            mediaRecorder.prepare();
-            mediaRecorder.start();
-
-            startAudioLevelMonitoring(); // Start monitoring the audio level
-
-            binding.getRoot().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    mediaRecorder.stop();
-                    mediaRecorder.reset();
-
-                    Toast.makeText(MainActivity.this, "Recording finished", Toast.LENGTH_SHORT).show();
-                    Log.d("MainActivity", "Recording stopped");
-
-                    handler.removeCallbacksAndMessages(null); // Stop audio level monitoring
-                    audioLevelIndicator.setProgress(0); // Reset progress
-                }
-            }, 2000); // 2000 milliseconds = 2 seconds
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void startAudioLevelMonitoring() {
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (mediaRecorder != null) {
-                    int maxAmplitude = mediaRecorder.getMaxAmplitude();
-                    int audioLevel = maxAmplitude / 327; // Scale it to 0-100 range
-                    audioLevelIndicator.setProgress(audioLevel);
-
-                    // Repeat the update every 100ms
-                    handler.postDelayed(this, 100);
+        new Thread(() -> {
+            short[] buffer = new short[bufferSize];
+            while (isRecording) {
+                int readSize = audioRecord.read(buffer, 0, buffer.length);
+                if (readSize > 0) {
+                    updateGraph(buffer);
                 }
             }
-        }, 100);
+        }).start();
+
+        handler.postDelayed(this::stopAudioRecording, 2000);
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
+    private void updateGraph(short[] buffer) {
+        runOnUiThread(() -> {
+            for (short amplitude : buffer) {
+                float normalizedAmplitude = amplitude / 32768f; // Normalize to -1 to 1 range
+                audioData.add(new Entry(audioData.size(), normalizedAmplitude));
+            }
+            dataSet.notifyDataSetChanged();
+            audioChart.notifyDataSetChanged();
+            audioChart.invalidate(); // Refresh the chart
+        });
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-
-        if (id == R.id.action_settings) {
-            return true;
+    private void stopAudioRecording() {
+        isRecording = false;
+        if (audioRecord != null) {
+            audioRecord.stop();
+            audioRecord.release();
+            audioRecord = null;
         }
 
-        return super.onOptionsItemSelected(item);
-    }
+        Toast.makeText(this, "Recording finished", Toast.LENGTH_SHORT).show();
 
-    @Override
-    public boolean onSupportNavigateUp() {
-        NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
-        return NavigationUI.navigateUp(navController, appBarConfiguration)
-                || super.onSupportNavigateUp();
+        audioData.clear();
+        dataSet.notifyDataSetChanged();
+        audioChart.notifyDataSetChanged();
+        audioChart.invalidate();
     }
 
     @Override

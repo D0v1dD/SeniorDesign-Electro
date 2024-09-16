@@ -2,3 +2,9 @@
 plugins {
     alias(libs.plugins.android.application) apply false
 }
+
+buildscript {
+    dependencies {
+        // Add any build script dependencies here
+    }
+}
