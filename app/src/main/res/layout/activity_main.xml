@@ -1,34 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
-    tools:context=".MainActivity">
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:gravity="center_horizontal">
 
-    <com.google.android.material.appbar.AppBarLayout
+    <!-- Toolbar -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:fitsSystemWindows="true">
-
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize" />
-
-    </com.google.android.material.appbar.AppBarLayout>
-
-    <include layout="@layout/content_main" />
-
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fab"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_marginEnd="@dimen/fab_margin"
-        android:layout_marginBottom="16dp"
-        app:srcCompat="@android:drawable/ic_dialog_email" />
+        android:layout_height="?attr/actionBarSize" />
 
     <!-- Button to start recording -->
     <Button
@@ -36,7 +19,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Start Record"
-        android:layout_gravity="center_horizontal"
         android:layout_marginTop="16dp"/>
 
     <!-- Button to stop recording -->
@@ -46,25 +28,13 @@
         android:layout_height="wrap_content"
         android:text="Stop Record"
         android:visibility="gone"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="16dp"/>
-
-    <!-- ProgressBar to display audio level -->
-    <ProgressBar
-        android:id="@+id/audio_level_indicator"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:max="100"
-        android:layout_gravity="center_horizontal"
-        style="@android:style/Widget.ProgressBar.Horizontal"
-        android:layout_marginTop="16dp"/>
+        android:layout_marginTop="32dp"/>
 
     <!-- LineChart to visualize real-time audio levels -->
     <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/audio_chart"
         android:layout_width="match_parent"
         android:layout_height="300dp"
-        android:layout_gravity="center_horizontal"
         android:layout_marginTop="32dp"/>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</LinearLayout>
