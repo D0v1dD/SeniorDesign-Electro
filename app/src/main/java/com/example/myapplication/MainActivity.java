@@ -11,6 +11,7 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.widget.Button;
 import android.widget.Toast;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -96,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void startAudioRecording() {
+private void startAudioRecording() {
     // Check if permission is granted before starting the recording
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
         Toast.makeText(MainActivity.this, "Audio recording permission is required", Toast.LENGTH_LONG).show();
@@ -123,11 +124,16 @@ public class MainActivity extends AppCompatActivity {
         while (isRecording) {
             int readSize = audioRecord.read(buffer, 0, buffer.length);
             if (readSize > 0) {
-                updateGraph(buffer);
+                // Log the number of bytes read from the microphone
+                Log.d("AudioRecord", "Audio data captured: " + readSize + " bytes");
+                updateGraph(buffer);  // Update the graph with the captured data
+            } else {
+                Log.d("AudioRecord", "No audio data captured.");
             }
         }
     });
 }
+
 
 
     private void updateGraph(short[] buffer) {
