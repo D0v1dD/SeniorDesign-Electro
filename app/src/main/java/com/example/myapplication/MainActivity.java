@@ -33,10 +33,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
     private boolean permissionToRecordAccepted = false;
     private LineChart audioChart;
-    private ArrayList<Entry> audioData;
     private LineDataSet dataSet;
     private LineData lineData;
-    private Handler handler;
     private Handler backgroundHandler;
     private HandlerThread backgroundThread;
     private boolean isRecording = false;
@@ -59,35 +57,33 @@ public class MainActivity extends AppCompatActivity {
         stopRecordButton = findViewById(R.id.button_stop_record);
         stopRecordButton.setVisibility(Button.GONE);  // Initially hide stop button
 
-        // Permission check
+        // Permission check (handle API level 33+ for READ_MEDIA_AUDIO)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ||
-        ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-        ActivityCompat.requestPermissions(this,
-        new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.READ_MEDIA_AUDIO},
-        REQUEST_RECORD_AUDIO_PERMISSION);
+                (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED)) {
+            ActivityCompat.requestPermissions(this,
+                    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU ?
+                            new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.READ_MEDIA_AUDIO} :
+                            new String[]{Manifest.permission.RECORD_AUDIO},
+                    REQUEST_RECORD_AUDIO_PERMISSION);
         } else {
-        permissionToRecordAccepted = true;
+            permissionToRecordAccepted = true;
         }
-
-
 
         // Initialize chart and audio monitoring
         audioChart = findViewById(R.id.audio_chart);
-        audioData = new ArrayList<>();
-        dataSet = new LineDataSet(audioData, "Audio Levels");
+        dataSet = new LineDataSet(new ArrayList<>(), "Audio Levels");
         lineData = new LineData(dataSet);
         audioChart.setData(lineData);
 
         // Set Start Button listener
-        // Set Start Button listener
         startRecordButton.setOnClickListener(view -> {
-        if (permissionToRecordAccepted) {
-        startAudioRecording();
-        } else {
-        Toast.makeText(MainActivity.this, "Recording permissions are not granted", Toast.LENGTH_LONG).show();
-        }
+            if (permissionToRecordAccepted) {
+                startAudioRecording();
+            } else {
+                Toast.makeText(MainActivity.this, "Recording permissions are not granted", Toast.LENGTH_LONG).show();
+            }
         });
-
 
         // Set Stop Button listener
         stopRecordButton.setOnClickListener(view -> {
@@ -97,81 +93,100 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-private void startAudioRecording() {
-    // Check if permission is granted before starting the recording
-    if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-        Toast.makeText(MainActivity.this, "Audio recording permission is required", Toast.LENGTH_LONG).show();
-        return;
+    private void startAudioRecording() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(MainActivity.this, "Audio recording permission is required", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        // Initialize the audio recording with appropriate buffer size
+        bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+        audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT, bufferSize);
+
+        // Start recording
+        audioRecord.startRecording();
+        isRecording = true;
+
+        // Hide the start button and show the stop button
+        runOnUiThread(() -> {
+            startRecordButton.setVisibility(Button.GONE);
+            stopRecordButton.setVisibility(Button.VISIBLE);
+        });
+
+        // Run audio capture and processing on a background thread
+        backgroundThread = new HandlerThread("AudioRecordingThread");
+        backgroundThread.start();
+        backgroundHandler = new Handler(backgroundThread.getLooper());
+
+        backgroundHandler.post(() -> {
+            short[] buffer = new short[bufferSize];
+            while (isRecording) {
+                int readSize = audioRecord.read(buffer, 0, buffer.length);
+                if (readSize > 0) {
+                    // Post the graph update on the UI thread to avoid blocking
+                    runOnUiThread(() -> updateGraph(buffer));
+                }
+            }
+        });
     }
 
-    bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
-    audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT, bufferSize);
-    audioRecord.startRecording();
-    isRecording = true;
+private void updateGraph(short[] buffer) {
+    ArrayList<Entry> newEntries = new ArrayList<>();
+    int currentX = dataSet.getEntryCount();  // Get the current number of entries to set the X value
 
-    startRecordButton.setVisibility(Button.GONE);  // Hide start button when recording
-    stopRecordButton.setVisibility(Button.VISIBLE);  // Show stop button during recording
+    for (short amplitude : buffer) {
+        float normalizedAmplitude = amplitude / 32768f;  // Normalize to -1 to 1 range
+        // Add new entries incrementing the X-value
+        newEntries.add(new Entry(currentX++, normalizedAmplitude));
+    }
 
-    // Start a background thread for recording and graph updates
-    backgroundThread = new HandlerThread("AudioRecordingThread");
-    backgroundThread.start();
-    backgroundHandler = new Handler(backgroundThread.getLooper());
-
-    // Start recording in the background
-    backgroundHandler.post(() -> {
-        short[] buffer = new short[bufferSize];
-        while (isRecording) {
-            int readSize = audioRecord.read(buffer, 0, buffer.length);
-            if (readSize > 0) {
-                // Log the number of bytes read from the microphone
-                Log.d("AudioRecord", "Audio data captured: " + readSize + " bytes");
-                updateGraph(buffer);  // Update the graph with the captured data
-            } else {
-                Log.d("AudioRecord", "No audio data captured.");
-            }
+    runOnUiThread(() -> {
+        // Add the new entries to the dataset
+        for (Entry entry : newEntries) {
+            dataSet.addEntry(entry);
         }
+
+        // Limit the number of points displayed to avoid performance issues
+        int maxVisiblePoints = 500;  // Adjust based on your needs
+        while (dataSet.getEntryCount() > maxVisiblePoints) {
+            dataSet.removeFirst();  // Remove the oldest data point
+        }
+
+        dataSet.notifyDataSetChanged();  // Notify the dataset that the data has changed
+        lineData.notifyDataChanged();    // Notify the lineData object
+        audioChart.notifyDataSetChanged();  // Notify the chart that the data has changed
+        audioChart.invalidate();  // Redraw the chart
     });
 }
 
 
-
-    private void updateGraph(short[] buffer) {
-        // Update the graph in the background thread and UI updates on the main thread
-        ArrayList<Entry> newEntries = new ArrayList<>();
-        for (short amplitude : buffer) {
-            float normalizedAmplitude = amplitude / 32768f; // Normalize to -1 to 1 range
-            newEntries.add(new Entry(audioData.size(), normalizedAmplitude));
-        }
-
-        // Post the graph update to the UI thread to avoid main thread blockage
-        runOnUiThread(() -> {
-            audioData.addAll(newEntries);
-            dataSet.notifyDataSetChanged();
-            audioChart.notifyDataSetChanged();
-            audioChart.invalidate(); // Refresh the chart
-        });
-    }
-
     private void stopAudioRecording() {
         isRecording = false;
         if (audioRecord != null) {
-            audioRecord.stop();
-            audioRecord.release();
-            audioRecord = null;
+            try {
+                audioRecord.stop();
+                audioRecord.release();
+                audioRecord = null;
+            } catch (IllegalStateException e) {
+                Log.e("AudioRecord", "Error stopping recording", e);
+            }
         }
 
         if (backgroundThread != null) {
             backgroundThread.quitSafely();
+            try {
+                backgroundThread.join();  // Ensure the thread is fully terminated
+            } catch (InterruptedException e) {
+                Log.e("AudioRecord", "Error joining background thread", e);
+            }
+            backgroundThread = null;
         }
 
-        Toast.makeText(this, "Recording finished", Toast.LENGTH_SHORT).show();
-
-        // Clear the graph data
-        audioData.clear();
-        dataSet.notifyDataSetChanged();
-        audioChart.notifyDataSetChanged();
-        audioChart.invalidate();
+        // Reset the UI to show the start button and hide the stop button
+        runOnUiThread(() -> {
+            Toast.makeText(this, "Recording stopped", Toast.LENGTH_SHORT).show();
+        });
     }
 
     @Override

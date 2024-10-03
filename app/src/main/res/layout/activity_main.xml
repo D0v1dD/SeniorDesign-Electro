@@ -30,11 +30,12 @@
         android:visibility="gone"
         android:layout_marginTop="32dp"/>
 
-    <!-- LineChart to visualize real-time audio levels -->
     <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/audio_chart"
         android:layout_width="match_parent"
         android:layout_height="300dp"
+        android:layout_gravity="center"
         android:layout_marginTop="32dp"/>
+
 
 </LinearLayout>
