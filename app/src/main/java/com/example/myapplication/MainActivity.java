@@ -93,47 +93,54 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void startAudioRecording() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(MainActivity.this, "Audio recording permission is required", Toast.LENGTH_LONG).show();
-            return;
-        }
+private void startAudioRecording() {
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        Toast.makeText(MainActivity.this, "Audio recording permission is required", Toast.LENGTH_LONG).show();
+        return;
+    }
 
-        // Initialize the audio recording with appropriate buffer size
-        bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
-        audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT, bufferSize);
+    // Initialize the audio recording with appropriate buffer size
+    bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+    audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT, bufferSize);
 
-        // Start recording
-        audioRecord.startRecording();
-        isRecording = true;
+    // Start recording
+    audioRecord.startRecording();
+    isRecording = true;
 
-        // Hide the start button and show the stop button
-        runOnUiThread(() -> {
-            startRecordButton.setVisibility(Button.GONE);
-            stopRecordButton.setVisibility(Button.VISIBLE);
-        });
+    // Hide the start button and show the stop button
+    runOnUiThread(() -> {
+        startRecordButton.setVisibility(Button.GONE);
+        stopRecordButton.setVisibility(Button.VISIBLE);
+    });
 
-        // Run audio capture and processing on a background thread
-        backgroundThread = new HandlerThread("AudioRecordingThread");
-        backgroundThread.start();
-        backgroundHandler = new Handler(backgroundThread.getLooper());
+    // Run audio capture and processing on a background thread
+    backgroundThread = new HandlerThread("AudioRecordingThread");
+    backgroundThread.start();
+    backgroundHandler = new Handler(backgroundThread.getLooper());
 
-        backgroundHandler.post(() -> {
-            short[] buffer = new short[bufferSize];
-            while (isRecording) {
-                int readSize = audioRecord.read(buffer, 0, buffer.length);
-                if (readSize > 0) {
-                    // Post the graph update on the UI thread to avoid blocking
-                    runOnUiThread(() -> updateGraph(buffer));
+    backgroundHandler.post(() -> {
+        short[] buffer = new short[bufferSize];
+        long lastUpdateTime = System.currentTimeMillis();  // Initialize the last update time
+
+        while (isRecording) {
+            int readSize = audioRecord.read(buffer, 0, buffer.length);
+            if (readSize > 0) {
+                long currentTime = System.currentTimeMillis();
+                // Throttle updates to the UI every 50ms
+                if (currentTime - lastUpdateTime > 50) {  // Adjust the interval as needed
+                    runOnUiThread(() -> updateGraph(buffer));  // Update the graph on the UI thread
+                    lastUpdateTime = currentTime;  // Update the last update time
                 }
             }
-        });
-    }
+        }
+    });
+}
+
 
 private void updateGraph(short[] buffer) {
     ArrayList<Entry> newEntries = new ArrayList<>();
-    int currentX = dataSet.getEntryCount();  // Get the current number of entries to set the X value
+    int currentX = dataSet.getEntryCount();  // Start X from the current number of entries
 
     for (short amplitude : buffer) {
         float normalizedAmplitude = amplitude / 32768f;  // Normalize to -1 to 1 range
@@ -142,24 +149,24 @@ private void updateGraph(short[] buffer) {
     }
 
     runOnUiThread(() -> {
-        // Add the new entries to the dataset
+        // Add the new entries to the dataset without clearing the previous ones
         for (Entry entry : newEntries) {
             dataSet.addEntry(entry);
         }
 
-        // Limit the number of points displayed to avoid performance issues
+        // Optionally, limit the number of points to prevent performance issues
         int maxVisiblePoints = 500;  // Adjust based on your needs
         while (dataSet.getEntryCount() > maxVisiblePoints) {
             dataSet.removeFirst();  // Remove the oldest data point
         }
 
-        dataSet.notifyDataSetChanged();  // Notify the dataset that the data has changed
-        lineData.notifyDataChanged();    // Notify the lineData object
-        audioChart.notifyDataSetChanged();  // Notify the chart that the data has changed
+        // Notify changes
+        dataSet.notifyDataSetChanged();
+        lineData.notifyDataChanged();
+        audioChart.notifyDataSetChanged();
         audioChart.invalidate();  // Redraw the chart
     });
 }
-
 
     private void stopAudioRecording() {
         isRecording = false;
