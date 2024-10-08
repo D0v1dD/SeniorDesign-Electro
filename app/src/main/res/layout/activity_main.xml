@@ -11,31 +11,41 @@
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize" />
+        android:layout_height="?attr/actionBarSize"
+        android:theme="?attr/actionBarTheme" />
 
     <!-- Button to start recording -->
     <Button
         android:id="@+id/button_start_record"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Start Record"
-        android:layout_marginTop="16dp"/>
+        android:text="Start Recording"
+        android:layout_marginTop="16dp"
+        android:enabled="true" />
 
     <!-- Button to stop recording -->
     <Button
         android:id="@+id/button_stop_record"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Stop Record"
+        android:text="Stop Recording"
         android:visibility="gone"
-        android:layout_marginTop="32dp"/>
+        android:layout_marginTop="16dp" />
 
+    <!-- Button to view saved files -->
+    <Button
+        android:id="@+id/button_view_saved_files"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="View Saved Files"
+        android:layout_gravity="center"
+        android:layout_marginTop="16dp" />
+
+    <!-- Audio chart to display real-time audio -->
     <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/audio_chart"
         android:layout_width="match_parent"
         android:layout_height="300dp"
-        android:layout_gravity="center"
-        android:layout_marginTop="32dp"/>
-
+        android:layout_marginTop="32dp" />
 
 </LinearLayout>
