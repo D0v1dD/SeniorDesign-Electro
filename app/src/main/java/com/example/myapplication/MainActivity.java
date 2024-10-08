@@ -241,7 +241,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
     private void saveAudioToFile(ArrayList<short[]> recordedAudioData) {
         File directory = getExternalFilesDir(null);  // Ensure the directory is available
 
