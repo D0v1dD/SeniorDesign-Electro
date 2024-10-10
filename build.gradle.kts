@@ -3,8 +3,6 @@ plugins {
     alias(libs.plugins.android.application) apply false
 }
 
-buildscript {
-    dependencies {
-        // Add any build script dependencies here
-    }
-}
+// The `buildscript` block is not needed for modern Gradle setups.
+// Dependencies for AGP are already handled in the settings.gradle.kts.
+

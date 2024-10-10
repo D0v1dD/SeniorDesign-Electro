@@ -36,26 +36,31 @@ public class MainActivity extends AppCompatActivity {
     private LineChart audioChart;
     private LineDataSet dataSet;
     private LineData lineData;
+    private SNRBar snrBar; // Custom SNR Bar
     private HandlerThread backgroundThread;
     private boolean isRecording = false;
     private static final int SAMPLE_RATE = 44100;
     private int bufferSize;
     private long lastUpdateTime = 0;  // Used for throttling graph updates
     private ArrayList<short[]> recordedAudioData = new ArrayList<>();  // Store the recorded audio data
+    private Handler handler = new Handler(); // Handler for SNR updates
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Using view binding to avoid findViewById redundancy
         ActivityMainBinding binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
         setSupportActionBar(binding.toolbar);
 
         // Initialize buttons as local variables
-        Button startRecordButton = findViewById(R.id.button_start_record);
-        Button stopRecordButton = findViewById(R.id.button_stop_record);
-        Button viewSavedFilesButton = findViewById(R.id.button_view_saved_files);  // View saved files button
+        Button startRecordButton = binding.buttonStartRecord;
+        Button stopRecordButton = binding.buttonStopRecord;
+        Button viewSavedFilesButton = binding.buttonViewSavedFiles;
+        snrBar = binding.snrBar;  // Initialize SNR bar
+
         stopRecordButton.setVisibility(Button.GONE);  // Initially hide stop button
 
         // Set Start Button listener
@@ -78,16 +83,15 @@ public class MainActivity extends AppCompatActivity {
         viewSavedFilesButton.setOnClickListener(view -> viewSavedBaselineFiles());
 
         // Initialize chart and audio monitoring
-        audioChart = findViewById(R.id.audio_chart);
+        audioChart = binding.audioChart;
         dataSet = new LineDataSet(new ArrayList<>(), "Audio Levels");
         lineData = new LineData(dataSet);
         audioChart.setData(lineData);
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);  // Add this line
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
         if (requestCode == REQUEST_RECORD_AUDIO_PERMISSION) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -108,11 +112,14 @@ public class MainActivity extends AppCompatActivity {
         // Initialize the audio recording with appropriate buffer size
         bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
 
-        audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT, bufferSize);
+        audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize);
+
+        if (audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
+            Toast.makeText(this, "Unable to initialize AudioRecord", Toast.LENGTH_LONG).show();
+            return;
+        }
 
         try {
-            // Start recording
             audioRecord.startRecording();
         } catch (SecurityException e) {
             Toast.makeText(this, "Recording permission is not granted", Toast.LENGTH_LONG).show();
@@ -130,8 +137,7 @@ public class MainActivity extends AppCompatActivity {
         // Run audio capture and processing on a background thread
         backgroundThread = new HandlerThread("AudioRecordingThread");
         backgroundThread.start();
-        Handler backgroundHandler;
-        backgroundHandler = new Handler(backgroundThread.getLooper());
+        Handler backgroundHandler = new Handler(backgroundThread.getLooper());
 
         backgroundHandler.post(() -> {
             short[] buffer = new short[bufferSize];
@@ -143,7 +149,10 @@ public class MainActivity extends AppCompatActivity {
                     long currentTime = System.currentTimeMillis();
                     if (currentTime - lastUpdateTime > 100) {
                         final short[] bufferCopy = buffer.clone();  // Clone buffer to avoid modification
-                        runOnUiThread(() -> updateGraph(bufferCopy));  // Update the graph on the UI thread
+                        runOnUiThread(() -> {
+                            updateGraph(bufferCopy); // Update graph
+                            updateSNRBar(bufferCopy); // Update SNR bar
+                        });
                         lastUpdateTime = currentTime;
                     }
                 }
@@ -177,6 +186,27 @@ public class MainActivity extends AppCompatActivity {
         audioChart.invalidate();
     }
 
+    private void updateSNRBar(short[] buffer) {
+        double signalPower = calculateRMS(buffer);
+        double noisePower = 1; // Placeholder for noise power
+        double snr = signalPower / noisePower;
+
+        // Normalize SNR for display (0 to 1)
+        float snrRatio = (float) Math.min(1, snr / 100.0);
+
+        if (snrBar != null) {
+            handler.post(() -> snrBar.updateSNR(snrRatio));
+        }
+    }
+
+    private double calculateRMS(short[] buffer) {
+        double sum = 0.0;
+        for (short s : buffer) {
+            sum += s * s;
+        }
+        return Math.sqrt(sum / buffer.length);
+    }
+
     private void stopAudioRecording() {
         isRecording = false;
 
@@ -203,27 +233,21 @@ public class MainActivity extends AppCompatActivity {
         // Save the recorded audio data to file after stopping the recording
         saveAudioToFile(recordedAudioData);  // Pass the ArrayList directly
 
-        runOnUiThread(() -> {
-            Toast.makeText(this, "Recording stopped", Toast.LENGTH_SHORT).show();
-        });
+        runOnUiThread(() -> Toast.makeText(this, "Recording stopped", Toast.LENGTH_SHORT).show());
     }
 
     private void viewSavedBaselineFiles() {
-        File directory = getExternalFilesDir(null);  // Get the app's external storage directory
+        File directory = getExternalFilesDir(null);
 
         if (directory != null && directory.exists()) {
-            File[] files = directory.listFiles();  // List all files in the directory
-
-            Log.d("ViewFiles", "Directory: " + directory.getAbsolutePath());  // Log directory path
+            File[] files = directory.listFiles();
 
             if (files != null && files.length > 0) {
                 String[] fileNames = new String[files.length];
                 for (int i = 0; i < files.length; i++) {
-                    fileNames[i] = files[i].getName();  // Get file names
-                    Log.d("ViewFiles", "Found file: " + files[i].getName());  // Log found files
+                    fileNames[i] = files[i].getName();
                 }
 
-                // Display the files in a dialog
                 new AlertDialog.Builder(this)
                         .setTitle("Saved Baseline Files")
                         .setItems(fileNames, (dialog, which) -> {
@@ -232,29 +256,23 @@ public class MainActivity extends AppCompatActivity {
                         })
                         .show();
             } else {
-                Log.e("ViewFiles", "No files found in directory");
                 Toast.makeText(this, "No saved baseline files found", Toast.LENGTH_SHORT).show();
             }
         } else {
-            Log.e("ViewFiles", "Directory is null or does not exist");
             Toast.makeText(this, "Directory not found", Toast.LENGTH_SHORT).show();
         }
     }
 
     private void saveAudioToFile(ArrayList<short[]> recordedAudioData) {
-        File directory = getExternalFilesDir(null);  // Ensure the directory is available
+        File directory = getExternalFilesDir(null);
 
-        if (directory != null) {
-            Log.d("FileSave", "Directory for saving files: " + directory.getAbsolutePath());
-        } else {
-            Log.e("FileSave", "Directory is null. File not saved.");
+        if (directory == null) {
             Toast.makeText(this, "Error: Directory not available", Toast.LENGTH_SHORT).show();
             return;
         }
 
         File outputFile = new File(directory, "baseline_audio.pcm");
 
-        // Flatten the ArrayList<short[]> into a single short[] array
         int totalSize = 0;
         for (short[] chunk : recordedAudioData) {
             totalSize += chunk.length;
@@ -278,13 +296,7 @@ public class MainActivity extends AppCompatActivity {
             fos.write(byteData);
             fos.flush();
 
-            if (outputFile.exists()) {
-                Log.d("FileSave", "File saved successfully at: " + outputFile.getAbsolutePath());
-                Toast.makeText(this, "Audio saved successfully at: " + outputFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
-            } else {
-                Log.e("FileSave", "Failed to save file at: " + outputFile.getAbsolutePath());
-                Toast.makeText(this, "Failed to save audio", Toast.LENGTH_LONG).show();
-            }
+            Toast.makeText(this, "Audio saved at: " + outputFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
 
         } catch (IOException e) {
             Log.e("AudioSave", "Error saving audio", e);

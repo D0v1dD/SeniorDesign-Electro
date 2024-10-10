@@ -1,51 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:gravity="center_horizontal">
+    android:padding="16dp">
 
-    <!-- Toolbar -->
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:theme="?attr/actionBarTheme" />
-
-    <!-- Button to start recording -->
-    <Button
-        android:id="@+id/button_start_record"
-        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Start Recording"
-        android:layout_marginTop="16dp"
-        android:enabled="true" />
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
 
-    <!-- Button to stop recording -->
-    <Button
-        android:id="@+id/button_stop_record"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Stop Recording"
-        android:visibility="gone"
-        android:layout_marginTop="16dp" />
+        <!-- Toolbar -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:theme="?attr/actionBarTheme"
+            android:contentDescription="App Toolbar" />
 
-    <!-- Button to view saved files -->
-    <Button
-        android:id="@+id/button_view_saved_files"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="View Saved Files"
-        android:layout_gravity="center"
-        android:layout_marginTop="16dp" />
+        <!-- Button to start recording -->
+        <Button
+            android:id="@+id/button_start_record"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Start Recording"
+            android:layout_marginTop="24dp"
+            android:enabled="true"
+            android:contentDescription="Start recording button"
+            android:padding="12dp" />
 
-    <!-- Audio chart to display real-time audio -->
-    <com.github.mikephil.charting.charts.LineChart
-        android:id="@+id/audio_chart"
-        android:layout_width="match_parent"
-        android:layout_height="300dp"
-        android:layout_marginTop="32dp" />
+        <!-- Button to stop recording -->
+        <Button
+            android:id="@+id/button_stop_record"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Stop Recording"
+            android:visibility="gone"
+            android:layout_marginTop="16dp"
+            android:contentDescription="Stop recording button"
+            android:padding="12dp" />
 
-</LinearLayout>
+        <!-- Button to view saved files -->
+        <Button
+            android:id="@+id/button_view_saved_files"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="View Saved Files"
+            android:layout_gravity="center"
+            android:layout_marginTop="24dp"
+            android:contentDescription="View saved files button"
+            android:padding="12dp" />
+
+        <!-- SNR Bar for signal-to-noise ratio -->
+        <com.example.myapplication.SNRBar
+            android:id="@+id/snr_bar"
+            android:layout_width="100dp"
+            android:layout_height="300dp"
+            android:layout_gravity="center"
+            android:layout_marginTop="24dp"
+            android:contentDescription="SNR bar showing signal-to-noise ratio"
+            app:snr_initial="0.5" />
+
+        <!-- Audio chart to display real-time audio -->
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/audio_chart"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:layout_marginTop="32dp"
+            android:contentDescription="Real-time audio chart" />
+
+    </LinearLayout>
+
+</ScrollView>

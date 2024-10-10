@@ -5,13 +5,13 @@
     <!-- Permissions for audio recording -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- Permissions for accessing external storage (Android versions below 29) -->
+    <!-- Permissions for accessing external storage (required for Android versions below 29) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
-    <!-- Media permissions for Android 33+ -->
+    <!-- Media permissions for Android 33+ (READ_MEDIA_AUDIO is needed for accessing audio files) -->
     <uses-permission
         android:name="android.permission.READ_MEDIA_IMAGES"
         android:maxSdkVersion="32" />
@@ -22,6 +22,10 @@
         android:name="android.permission.READ_MEDIA_AUDIO"
         android:maxSdkVersion="32" />
 
+    <!-- Modify audio settings (optional, based on your app’s needs) -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <!-- Ensure backup and restore configurations -->
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -33,6 +37,7 @@
         android:theme="@style/Theme.MyApplication"
         tools:targetApi="31">
 
+        <!-- Main Activity Declaration -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

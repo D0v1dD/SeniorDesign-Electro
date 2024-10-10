@@ -1,24 +1,44 @@
 [versions]
+# Android Gradle Plugin version
 agp = "8.5.0"
+
+# Unit testing versions
 junit = "4.13.2"
-junitVersion = "1.1.5"
+junitExt = "1.1.5"
+
+# UI testing dependencies
 espressoCore = "3.5.1"
+
+# AndroidX Libraries
 appcompat = "1.6.1"
 material = "1.10.0"
 constraintlayout = "2.1.4"
+
+# Android Navigation Component
 navigationFragment = "2.6.0"
 navigationUi = "2.6.0"
 
+# MPAndroidChart version
+mpandroidchart = "v3.1.0"
+
 [libraries]
+# Testing libraries
 junit = { group = "junit", name = "junit", version.ref = "junit" }
-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitExt" }
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+
+# AndroidX libraries
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+
+# Android Navigation libraries
 navigation-fragment = { group = "androidx.navigation", name = "navigation-fragment", version.ref = "navigationFragment" }
 navigation-ui = { group = "androidx.navigation", name = "navigation-ui", version.ref = "navigationUi" }
 
-[plugins]
-android-application = { id = "com.android.application", version.ref = "agp" }
+# MPAndroidChart library
+mpandroidchart = { group = "com.github.PhilJay", name = "MPAndroidChart", version.ref = "mpandroidchart" }
 
+[plugins]
+# Android Gradle Plugin
+android-application = { id = "com.android.application", version.ref = "agp" }
