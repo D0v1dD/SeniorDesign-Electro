@@ -186,18 +186,20 @@ public class MainActivity extends AppCompatActivity {
         audioChart.invalidate();
     }
 
-    private void updateSNRBar(short[] buffer) {
-        double signalPower = calculateRMS(buffer);
-        double noisePower = 1; // Placeholder for noise power
-        double snr = signalPower / noisePower;
+private void updateSNRBar(short[] buffer) {
+    double signalPower = calculateRMS(buffer);
+    double noisePower = 1; // Placeholder for noise power, should be updated based on baseline noise
+    double snr = signalPower / noisePower;
 
-        // Normalize SNR for display (0 to 1)
-        float snrRatio = (float) Math.min(1, snr / 100.0);
+    // Normalize SNR for display (0 to 1)
+    float snrRatio = (float) Math.min(1, snr / 100.0);
 
-        if (snrBar != null) {
-            handler.post(() -> snrBar.updateSNR(snrRatio));
-        }
+    // Update SNR bar with both the ratio (for display) and the actual SNR value
+    if (snrBar != null) {
+        handler.post(() -> snrBar.updateSNR(snrRatio, (float) snr));
     }
+}
+
 
     private double calculateRMS(short[] buffer) {
         double sum = 0.0;

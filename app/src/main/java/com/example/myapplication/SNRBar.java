@@ -3,6 +3,7 @@ package com.example.myapplication;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.util.AttributeSet;
 import android.view.View;
@@ -12,7 +13,9 @@ import androidx.annotation.Nullable;
 public class SNRBar extends View {
 
     private Paint paint;
+    private Paint textPaint;
     private float snrRatio = 0f; // SNR ratio (0 to 1)
+    private float snrValue = 0f; // Actual SNR value to display numerically
 
     // Constructors for custom view
     public SNRBar(Context context) {
@@ -46,12 +49,19 @@ public class SNRBar extends View {
     private void init() {
         paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setStyle(Paint.Style.FILL);
+
+        // Initialize paint for text
+        textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        textPaint.setColor(Color.BLACK);
+        textPaint.setTextSize(40f);
+        textPaint.setTextAlign(Paint.Align.CENTER);
     }
 
     // Method to update the SNR ratio and redraw the bar
-    public void updateSNR(float newSnrRatio) {
+    public void updateSNR(float newSnrRatio, float newSnrValue) {
         // Ensure the ratio is between 0 and 1
         snrRatio = Math.max(0, Math.min(newSnrRatio, 1));
+        snrValue = newSnrValue;
         invalidate(); // Trigger re-draw on UI thread
     }
 
@@ -78,5 +88,8 @@ public class SNRBar extends View {
 
         // Draw the filled part of the bar representing the SNR
         canvas.drawRect(0, barHeight - filledHeight, getWidth(), barHeight, paint);
+
+        // Draw the numerical SNR value at the center of the bar
+        canvas.drawText(String.format("SNR: %.2f", snrValue), getWidth() / 2f, barHeight / 2f, textPaint);
     }
 }
