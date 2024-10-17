@@ -69,27 +69,36 @@ public class SNRBar extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
+        // Padding for the bar to avoid edge collision
+        int padding = 10;
+
         // Calculate the height of the filled portion of the bar based on SNR ratio
-        int barHeight = getHeight();
+        int barHeight = getHeight() - 2 * padding;
         int filledHeight = (int) (barHeight * snrRatio);
 
         // Draw the background (empty part of the bar)
         paint.setColor(0xFFCCCCCC); // Light grey color for background
-        canvas.drawRect(0, 0, getWidth(), barHeight, paint);
+        canvas.drawRect(0, padding, getWidth(), barHeight + padding, paint);
 
         // Set color based on SNR value
         if (snrRatio < 0.33f) {
             paint.setColor(0xFFFF0000); // Red for low SNR
+            textPaint.setColor(Color.WHITE); // Set text color to white for better visibility
         } else if (snrRatio < 0.66f) {
             paint.setColor(0xFFFFFF00); // Yellow for medium SNR
+            textPaint.setColor(Color.BLACK); // Set text color to black
         } else {
             paint.setColor(0xFF00FF00); // Green for high SNR
+            textPaint.setColor(Color.BLACK); // Set text color to black
         }
 
         // Draw the filled part of the bar representing the SNR
-        canvas.drawRect(0, barHeight - filledHeight, getWidth(), barHeight, paint);
+        canvas.drawRect(0, barHeight + padding - filledHeight, getWidth(), barHeight + padding, paint);
+
+        // Adjust text size based on the bar height
+        textPaint.setTextSize(Math.min(40f, barHeight / 5f));
 
         // Draw the numerical SNR value at the center of the bar
-        canvas.drawText(String.format("SNR: %.2f", snrValue), getWidth() / 2f, barHeight / 2f, textPaint);
+        canvas.drawText(String.format("SNR: %.2f", snrValue), getWidth() / 2f, barHeight / 2f + padding, textPaint);
     }
 }
