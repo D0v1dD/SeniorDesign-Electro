@@ -1,104 +1,85 @@
 package com.example.myapplication;
 
 import android.content.Context;
-import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.util.AttributeSet;
 import android.view.View;
 
-import androidx.annotation.Nullable;
-
 public class SNRBar extends View {
-
-    private Paint paint;
+    private float currentSNR;
+    private float maxSNR;  // Track the highest recorded SNR value
+    private Paint snrPaint;
+    private Paint maxSNRPaint;
     private Paint textPaint;
-    private float snrRatio = 0f; // SNR ratio (0 to 1)
-    private float snrValue = 0f; // Actual SNR value to display numerically
+    private String snrCategory = "";  // Track the current SNR category
 
-    // Constructors for custom view
-    public SNRBar(Context context) {
-        super(context);
-        init();
-    }
-
-    public SNRBar(Context context, @Nullable AttributeSet attrs) {
+    public SNRBar(Context context, AttributeSet attrs) {
         super(context, attrs);
         init();
-
-        // Get custom attributes from XML (if any)
-        TypedArray a = context.getTheme().obtainStyledAttributes(
-                attrs,
-                R.styleable.SNRBar,
-                0, 0);
-
-        try {
-            snrRatio = a.getFloat(R.styleable.SNRBar_snr_initial, 0f);
-        } finally {
-            a.recycle();
-        }
     }
 
-    public SNRBar(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
-        init();
-    }
-
-    // Initialize the paint and other resources
     private void init() {
-        paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        paint.setStyle(Paint.Style.FILL);
+        snrPaint = new Paint();
+        snrPaint.setColor(Color.BLUE);
 
-        // Initialize paint for text
-        textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        maxSNRPaint = new Paint();
+        maxSNRPaint.setColor(Color.RED);
+        maxSNRPaint.setStrokeWidth(5f);
+        maxSNRPaint.setStyle(Paint.Style.STROKE);
+
+        textPaint = new Paint();
         textPaint.setColor(Color.BLACK);
         textPaint.setTextSize(40f);
         textPaint.setTextAlign(Paint.Align.CENTER);
+
+        maxSNR = 0;  // Initialize with 0 as no recording has been done yet
     }
 
-    // Method to update the SNR ratio and redraw the bar
-    public void updateSNR(float newSnrRatio, float newSnrValue) {
-        // Ensure the ratio is between 0 and 1
-        snrRatio = Math.max(0, Math.min(newSnrRatio, 1));
-        snrValue = newSnrValue;
-        invalidate(); // Trigger re-draw on UI thread
+    public void updateSNR(float snrRatio, float snrValue) {
+        currentSNR = snrValue;
+
+        // Update max SNR if the current value is greater
+        if (currentSNR > maxSNR) {
+            maxSNR = currentSNR;
+        }
+
+        // Trigger redraw
+        invalidate();
+    }
+
+    public void setSNRCategory(String category) {
+        this.snrCategory = category;
+        invalidate();  // Trigger redraw to update the displayed category
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        // Padding for the bar to avoid edge collision
-        int padding = 10;
+        // Calculate the height of the bar based on the current SNR value
+        float snrHeight = getHeight() * (currentSNR / 100);  // Assuming SNR value is normalized to max 100
+        canvas.drawRect(0, getHeight() - snrHeight, getWidth(), getHeight(), snrPaint);
 
-        // Calculate the height of the filled portion of the bar based on SNR ratio
-        int barHeight = getHeight() - 2 * padding;
-        int filledHeight = (int) (barHeight * snrRatio);
+        // Draw the maximum SNR indicator
+        float maxSNRHeight = getHeight() * (maxSNR / 100);
+        canvas.drawLine(0, getHeight() - maxSNRHeight, getWidth(), getHeight() - maxSNRHeight, maxSNRPaint);
 
-        // Draw the background (empty part of the bar)
-        paint.setColor(0xFFCCCCCC); // Light grey color for background
-        canvas.drawRect(0, padding, getWidth(), barHeight + padding, paint);
+        // Draw the rating text to indicate SNR quality
+        canvas.drawText(snrCategory, getWidth() / 2, getHeight() / 2, textPaint);
+    }
 
-        // Set color based on SNR value
-        if (snrRatio < 0.33f) {
-            paint.setColor(0xFFFF0000); // Red for low SNR
-            textPaint.setColor(Color.WHITE); // Set text color to white for better visibility
-        } else if (snrRatio < 0.66f) {
-            paint.setColor(0xFFFFFF00); // Yellow for medium SNR
-            textPaint.setColor(Color.BLACK); // Set text color to black
+    // Provide feedback on the SNR quality
+    private String getSNRRating(float snrValue) {
+        if (snrValue < 10) {
+            return "Poor";
+        } else if (snrValue < 30) {
+            return "Average";
+        } else if (snrValue < 60) {
+            return "Good";
         } else {
-            paint.setColor(0xFF00FF00); // Green for high SNR
-            textPaint.setColor(Color.BLACK); // Set text color to black
+            return "Excellent";
         }
-
-        // Draw the filled part of the bar representing the SNR
-        canvas.drawRect(0, barHeight + padding - filledHeight, getWidth(), barHeight + padding, paint);
-
-        // Adjust text size based on the bar height
-        textPaint.setTextSize(Math.min(40f, barHeight / 5f));
-
-        // Draw the numerical SNR value at the center of the bar
-        canvas.drawText(String.format("SNR: %.2f", snrValue), getWidth() / 2f, barHeight / 2f + padding, textPaint);
     }
 }

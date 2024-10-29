@@ -36,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int GRAPH_UPDATE_INTERVAL = 500;  // Update interval for graph (milliseconds)
     private static final int SNR_UPDATE_INTERVAL = 500;  // Update interval for SNR bar (milliseconds)
     private float[] baselineNoiseValues;  // Store baseline noise values
+    private float baselineAverage = 0; // Store average baseline noise level
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,29 +48,50 @@ public class MainActivity extends AppCompatActivity {
 
         setSupportActionBar(binding.toolbar);
 
-        // Initialize buttons as local variables
+        // Initialize buttons
         Button recordBaselineButton = binding.buttonRecordBaseline;
         Button startRecordButton = binding.buttonStartRecord;
         Button stopRecordButton = binding.buttonStopRecord;
         Button viewSavedFilesButton = binding.buttonViewSavedFiles;
-        snrBar = binding.snrBar;  // Initialize SNR bar
+        snrBar = binding.snrBar;
 
-        stopRecordButton.setVisibility(Button.GONE);  // Initially hide stop button
+        // Hide stop recording button initially
+        stopRecordButton.setVisibility(Button.GONE);
 
-        // Instantiate AudioProcessor
-        audioProcessor = new AudioProcessor(this, this::updateGraph, this::updateSNRBar);
+        // Request RECORD_AUDIO permission
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestRecordAudioPermission();
+        } else {
+            initializeAudioProcessor();
+        }
 
         // Set Record Baseline Button listener
-        recordBaselineButton.setOnClickListener(view -> recordBaseline());
+        recordBaselineButton.setOnClickListener(view -> {
+            if (permissionToRecordAccepted) {
+                recordBaseline();
+            } else {
+                requestRecordAudioPermission();
+            }
+        });
 
         // Set Start Button listener
-        startRecordButton.setOnClickListener(view -> startRecording());
+        startRecordButton.setOnClickListener(view -> {
+            if (permissionToRecordAccepted) {
+                startRecording();
+                startRecordButton.setVisibility(Button.GONE);
+                stopRecordButton.setVisibility(Button.VISIBLE);
+            } else {
+                requestRecordAudioPermission();
+            }
+        });
 
         // Set Stop Button listener
         stopRecordButton.setOnClickListener(view -> {
-            audioProcessor.stopRecording();
-            stopRecordButton.setVisibility(Button.GONE);
-            startRecordButton.setVisibility(Button.VISIBLE);
+            if (audioProcessor != null) {
+                audioProcessor.stopRecording();
+                stopRecordButton.setVisibility(Button.GONE);
+                startRecordButton.setVisibility(Button.VISIBLE);
+            }
         });
 
         // Set View Saved Files button listener
@@ -82,11 +104,28 @@ public class MainActivity extends AppCompatActivity {
         audioChart.setData(lineData);
     }
 
+    private void initializeAudioProcessor() {
+        // Instantiate AudioProcessor after permission is granted
+        audioProcessor = new AudioProcessor(this, new AudioProcessor.RecordingCallback() {
+            @Override
+            public void onAudioDataReceived(short[] audioBuffer) {
+                updateGraph(audioBuffer);
+            }
+
+            @Override
+            public void onBaselineRecorded(float[] baselineValues) {
+                baselineNoiseValues = baselineValues;
+                baselineAverage = calculateAverage(baselineValues);
+                Toast.makeText(MainActivity.this, "Baseline recorded successfully.", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
     private void recordBaseline() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+        if (audioProcessor != null) {
             audioProcessor.recordBaseline();
         } else {
-            requestRecordAudioPermission();
+            Toast.makeText(this, "Audio Processor is not initialized.", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -96,11 +135,11 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            audioProcessor.setBaseline(baselineNoiseValues);  // Set the baseline in the audio processor
+        if (audioProcessor != null) {
+            audioProcessor.setBaseline(baselineNoiseValues);
             audioProcessor.startRecording();
         } else {
-            requestRecordAudioPermission();
+            Toast.makeText(this, "Audio Processor is not initialized.", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -116,6 +155,7 @@ public class MainActivity extends AppCompatActivity {
             permissionToRecordAccepted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
             if (permissionToRecordAccepted) {
                 Toast.makeText(this, "Permission granted, you can now record audio.", Toast.LENGTH_SHORT).show();
+                initializeAudioProcessor();
             } else {
                 Toast.makeText(this, "Recording permission is required", Toast.LENGTH_LONG).show();
             }
@@ -155,18 +195,12 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void updateSNRBar(float snrRatio, float snrValue) {
-        long currentTime = System.currentTimeMillis();
-        if (currentTime - lastSNRUpdateTime < SNR_UPDATE_INTERVAL) {
-            return;
+    private float calculateAverage(float[] values) {
+        float sum = 0;
+        for (float value : values) {
+            sum += value;
         }
-        lastSNRUpdateTime = currentTime;
-
-        runOnUiThread(() -> {
-            if (snrBar != null) {
-                snrBar.updateSNR(snrRatio, snrValue);
-            }
-        });
+        return values.length > 0 ? sum / values.length : 0;
     }
 
     private void viewSavedBaselineFiles() {

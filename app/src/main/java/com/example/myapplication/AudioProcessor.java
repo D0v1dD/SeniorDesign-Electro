@@ -20,8 +20,12 @@ public class AudioProcessor {
     private boolean isRecording;
     private static final String TAG = "AudioProcessor";
     private float[] baselineNoiseValues;
+    private RecordingCallback callback;
 
-    public AudioProcessor(Context context) {
+    // Constructor accepting RecordingCallback as a parameter
+    public AudioProcessor(Context context, RecordingCallback callback) {
+        this.callback = callback;
+
         if (BUFFER_SIZE == AudioRecord.ERROR || BUFFER_SIZE == AudioRecord.ERROR_BAD_VALUE) {
             Log.e(TAG, "Invalid buffer size: " + BUFFER_SIZE);
             return; // Handle invalid buffer size appropriately
@@ -69,11 +73,51 @@ public class AudioProcessor {
 
         isRecording = false;
         Log.d(TAG, "Baseline recorded successfully");
+
+        // Callback to notify baseline recording completion
+        if (callback != null) {
+            callback.onBaselineRecorded(baselineNoiseValues);
+        }
     }
 
     public void setBaseline(float[] baselineValues) {
         this.baselineNoiseValues = baselineValues;
     }
 
-    // ... continue with startRecording() and other methods
+    public void startRecording() {
+        if (audioRecord == null || audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
+            Log.e(TAG, "AudioRecord not properly initialized");
+            return;
+        }
+
+        isRecording = true;
+        new Thread(this::processRecording).start();
+    }
+
+    private void processRecording() {
+        short[] audioBuffer = new short[BUFFER_SIZE];
+
+        while (isRecording) {
+            int readBytes = audioRecord.read(audioBuffer, 0, BUFFER_SIZE);
+            if (readBytes > 0) {
+                // Callback to notify new audio data
+                if (callback != null) {
+                    callback.onAudioDataReceived(audioBuffer);
+                }
+            }
+        }
+    }
+
+    public void stopRecording() {
+        if (isRecording) {
+            isRecording = false;
+            audioRecord.stop();
+        }
+    }
+
+    // Define the RecordingCallback interface
+    public interface RecordingCallback {
+        void onAudioDataReceived(short[] audioBuffer);
+        void onBaselineRecorded(float[] baselineValues);
+    }
 }

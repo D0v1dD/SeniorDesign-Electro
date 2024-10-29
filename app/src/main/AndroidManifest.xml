@@ -6,10 +6,12 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- Permissions for accessing external storage (required for Android versions below 29) -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
+        android:maxSdkVersion="28" />
 
     <!-- Media permissions for Android 33+ (READ_MEDIA_AUDIO is needed for accessing audio files) -->
     <uses-permission
