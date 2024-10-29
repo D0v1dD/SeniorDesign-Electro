@@ -1,87 +1,103 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView
+<androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:padding="16dp">
+    android:layout_height="match_parent">
 
+    <!-- Toolbar -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="0dp"
+        android:layout_height="?attr/actionBarSize"
+        android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
+        android:contentDescription="@string/app_toolbar_description"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Buttons arranged in a vertical LinearLayout -->
     <LinearLayout
-        android:layout_width="match_parent"
+        android:id="@+id/button_container"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:gravity="center_horizontal">
+        android:gravity="center_horizontal"
+        app:layout_constraintTop_toBottomOf="@id/toolbar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp">
 
-        <!-- Toolbar -->
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:theme="?attr/actionBarTheme"
-            android:contentDescription="App Toolbar" />
-
-        <!-- Button to start recording -->
-        <Button
-            android:id="@+id/button_start_record"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Start Recording"
-            android:layout_marginTop="24dp"
-            android:enabled="true"
-            android:contentDescription="Start recording button"
-            android:padding="12dp" />
-
-        <!-- Button to record baseline noise -->
-        <Button
+        <!-- Record Baseline Button -->
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/button_record_baseline"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Record Baseline Noise"
-            android:layout_marginTop="24dp"
-            android:contentDescription="Record baseline noise button"
-            android:padding="12dp" />
+            android:text="@string/record_baseline_noise"
+            android:contentDescription="@string/record_baseline_noise_button"
+            android:layout_marginBottom="8dp" />
 
-
-        <!-- Button to stop recording -->
-        <Button
-            android:id="@+id/button_stop_record"
+        <!-- FrameLayout to overlap Start and Stop buttons -->
+        <FrameLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Stop Recording"
-            android:visibility="gone"
-            android:layout_marginTop="16dp"
-            android:contentDescription="Stop recording button"
-            android:padding="12dp" />
+            android:layout_height="wrap_content">
 
-        <!-- Button to view saved files -->
-        <Button
+            <!-- Start Recording Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_start_record"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/start_recording"
+                android:contentDescription="@string/start_recording_button"
+                android:enabled="false" />
+
+            <!-- Stop Recording Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_stop_record"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/stop_recording"
+                android:contentDescription="@string/stop_recording_button"
+                android:visibility="gone" />
+
+        </FrameLayout>
+
+        <!-- View Saved Files Button -->
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/button_view_saved_files"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="View Saved Files"
-            android:layout_gravity="center"
-            android:layout_marginTop="24dp"
-            android:contentDescription="View saved files button"
-            android:padding="12dp" />
-
-        <!-- SNR Bar for signal-to-noise ratio -->
-        <com.example.myapplication.SNRBar
-            android:id="@+id/snr_bar"
-            android:layout_width="100dp"
-            android:layout_height="300dp"
-            android:layout_gravity="center"
-            android:layout_marginTop="24dp"
-            android:contentDescription="SNR bar showing signal-to-noise ratio"
-            app:snr_initial="0.5" />
-
-        <!-- Audio chart to display real-time audio -->
-        <com.github.mikephil.charting.charts.LineChart
-            android:id="@+id/audio_chart"
-            android:layout_width="match_parent"
-            android:layout_height="300dp"
-            android:layout_marginTop="32dp"
-            android:contentDescription="Real-time audio chart" />
+            android:text="@string/view_saved_files"
+            android:contentDescription="@string/view_saved_files_button"
+            android:layout_marginTop="8dp" />
 
     </LinearLayout>
 
-</ScrollView>
+    <!-- SNR Bar for signal-to-noise ratio -->
+    <com.example.myapplication.SNRBar
+        android:id="@+id/snr_bar"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:contentDescription="@string/snr_bar_description"
+        app:layout_constraintTop_toBottomOf="@id/button_container"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/audio_chart"
+        app:layout_constraintHeight_percent="0.2" />
+
+    <!-- Audio chart to display real-time audio -->
+    <com.github.mikephil.charting.charts.LineChart
+        android:id="@+id/audio_chart"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:contentDescription="@string/audio_chart_description"
+        app:layout_constraintTop_toBottomOf="@id/snr_bar"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
