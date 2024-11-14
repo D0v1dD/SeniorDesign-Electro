@@ -13,22 +13,25 @@ import androidx.core.content.ContextCompat;
 import java.util.Arrays;
 
 public class AudioProcessor {
-    private static final int SAMPLE_RATE = 44100; // Hz
-    private static final int BUFFER_SIZE = AudioRecord.getMinBufferSize(SAMPLE_RATE,
-            AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+    private static final String TAG = "AudioProcessor";
+
+    // Made SAMPLE_RATE public to allow external classes to access it (e.g., MicrophoneTestFragment)
+    public static final int SAMPLE_RATE = 44100; // Hz
+    private static final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
+    private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
+    private static final int BUFFER_SIZE = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
 
     private AudioRecord audioRecord;
     private boolean isRecording;
-    private static final String TAG = "AudioProcessor";
     private float[] baselineNoiseValues;
-    private RecordingCallback callback;
-
+    private RecordingCallback recordingCallback;
+    private TestingCallback testingCallback;
     private Context context;
 
-    // Constructor accepting RecordingCallback as a parameter
-    public AudioProcessor(Context context, RecordingCallback callback) {
+    // Constructor accepting a RecordingCallback as a parameter
+    public AudioProcessor(Context context, RecordingCallback recordingCallback) {
         this.context = context;
-        this.callback = callback;
+        this.recordingCallback = recordingCallback;
 
         if (BUFFER_SIZE == AudioRecord.ERROR || BUFFER_SIZE == AudioRecord.ERROR_BAD_VALUE) {
             Log.e(TAG, "Invalid buffer size: " + BUFFER_SIZE);
@@ -38,8 +41,13 @@ public class AudioProcessor {
         // Check if permission is granted before initializing AudioRecord
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             try {
-                audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE,
-                        AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, BUFFER_SIZE);
+                audioRecord = new AudioRecord(
+                        MediaRecorder.AudioSource.MIC,
+                        SAMPLE_RATE,
+                        CHANNEL_CONFIG,
+                        AUDIO_FORMAT,
+                        BUFFER_SIZE
+                );
 
                 if (audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
                     Log.e(TAG, "AudioRecord initialization failed. Check the parameters.");
@@ -54,9 +62,9 @@ public class AudioProcessor {
         }
     }
 
+    // Recording methods (existing functionality)
     public void recordBaseline() {
-        if (audioRecord == null || audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
-            Log.e(TAG, "AudioRecord not properly initialized");
+        if (!isAudioRecordInitialized()) {
             return;
         }
 
@@ -70,7 +78,6 @@ public class AudioProcessor {
 
         if (audioRecord != null) {
             audioRecord.startRecording();
-
             while (isRecording) {
                 int readBytes = audioRecord.read(audioBuffer, 0, BUFFER_SIZE);
                 Log.d(TAG, "Bytes read for baseline: " + readBytes);
@@ -89,9 +96,9 @@ public class AudioProcessor {
             }
             audioRecord.stop();
 
-            // Notify MainActivity that baseline recording is complete
-            if (callback != null) {
-                callback.onBaselineRecorded(baselineNoiseValues);
+            // Notify MainActivity (recordingCallback) that baseline recording is complete
+            if (recordingCallback != null) {
+                recordingCallback.onBaselineRecorded(baselineNoiseValues);
             }
         } else {
             Log.e(TAG, "AudioRecord object is null.");
@@ -101,13 +108,7 @@ public class AudioProcessor {
     public void stopBaselineRecording() {
         if (isRecording) {
             isRecording = false;
-            if (audioRecord != null) {
-                try {
-                    audioRecord.stop();
-                } catch (IllegalStateException e) {
-                    Log.e(TAG, "Error stopping AudioRecord during baseline recording", e);
-                }
-            }
+            stopAudioRecord();
         }
     }
 
@@ -116,8 +117,7 @@ public class AudioProcessor {
     }
 
     public void startRecording() {
-        if (audioRecord == null || audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
-            Log.e(TAG, "AudioRecord not properly initialized");
+        if (!isAudioRecordInitialized()) {
             return;
         }
 
@@ -143,12 +143,12 @@ public class AudioProcessor {
                     short[] trimmedBuffer = Arrays.copyOf(audioBuffer, readBytes);
 
                     // Callback to notify new audio data
-                    if (callback != null) {
-                        callback.onAudioDataReceived(trimmedBuffer);
+                    if (recordingCallback != null) {
+                        recordingCallback.onAudioDataReceived(trimmedBuffer);
 
                         // Calculate SNR
                         double snrValue = calculateSNR(trimmedBuffer, baselineNoiseValues);
-                        callback.onSNRCalculated(snrValue);
+                        recordingCallback.onSNRCalculated(snrValue);
                     }
                 } else {
                     Log.e(TAG, "Failed to read audio data.");
@@ -160,18 +160,80 @@ public class AudioProcessor {
         }
     }
 
-
     public void stopRecording() {
         if (isRecording) {
             isRecording = false;
-            if (audioRecord != null) {
-                try {
-                    audioRecord.stop();
-                } catch (IllegalStateException e) {
-                    Log.e(TAG, "Error stopping AudioRecord during recording", e);
+            stopAudioRecord();
+        }
+    }
+
+    // Microphone Testing Methods (new functionality)
+    public void testMicrophone(TestingCallback testingCallback) {
+        if (!isAudioRecordInitialized()) {
+            return;
+        }
+
+        this.testingCallback = testingCallback;
+        short[] audioBuffer = new short[BUFFER_SIZE];
+        isRecording = true;
+
+        new Thread(() -> {
+            if (audioRecord == null) {
+                Log.e(TAG, "AudioRecord not properly initialized for testing");
+                return;
+            }
+
+            audioRecord.startRecording();
+            long recordingStart = System.currentTimeMillis();
+            long testDuration = 3000; // Record for 3 seconds
+
+            while (isRecording && System.currentTimeMillis() - recordingStart < testDuration) {
+                int readBytes = audioRecord.read(audioBuffer, 0, BUFFER_SIZE);
+                if (readBytes > 0 && testingCallback != null) {
+                    short[] trimmedBuffer = Arrays.copyOf(audioBuffer, readBytes);
+                    testingCallback.onTestingDataReceived(trimmedBuffer);
                 }
             }
+
+            if (isRecording) {
+                stopAudioRecord();
+            }
+
+            // Analyze audio after recording
+            double amplitude = calculateAmplitude(audioBuffer);
+            double[] frequencySpectrum = calculateFrequencySpectrum(audioBuffer);
+
+            if (testingCallback != null) {
+                testingCallback.onTestCompleted(amplitude, frequencySpectrum);
+            }
+
+        }).start();
+    }
+
+    public void stopMicrophoneTest() {
+        if (isRecording) {
+            isRecording = false;
+            stopAudioRecord();
         }
+    }
+
+    // Utility Methods
+    private void stopAudioRecord() {
+        if (audioRecord != null) {
+            try {
+                audioRecord.stop();
+            } catch (IllegalStateException e) {
+                Log.e(TAG, "Error stopping AudioRecord", e);
+            }
+        }
+    }
+
+    private boolean isAudioRecordInitialized() {
+        if (audioRecord == null || audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
+            Log.e(TAG, "AudioRecord not properly initialized");
+            return false;
+        }
+        return true;
     }
 
     private double calculateSNR(short[] signalBuffer, float[] noiseBuffer) {
@@ -215,10 +277,43 @@ public class AudioProcessor {
         return sum / buffer.length;
     }
 
+    private double calculateAmplitude(short[] audioBuffer) {
+        long sum = 0;
+        for (short sample : audioBuffer) {
+            sum += Math.abs(sample);
+        }
+        return (double) sum / audioBuffer.length;
+    }
+
+    private double[] calculateFrequencySpectrum(short[] audioBuffer) {
+        // Convert short[] to double[] for FFT
+        double[] audioDataDouble = new double[audioBuffer.length];
+        for (int i = 0; i < audioBuffer.length; i++) {
+            audioDataDouble[i] = audioBuffer[i] / 32768.0; // Normalize
+        }
+
+        // Perform FFT and return frequency spectrum
+        double[] frequencySpectrum = fft(audioDataDouble);
+        return frequencySpectrum;
+    }
+
+    // Placeholder FFT implementation (to be replaced with an actual FFT algorithm or library)
+    private double[] fft(double[] audioData) {
+        // TODO: Implement FFT calculation or use an FFT library (e.g., JTransform)
+        // This placeholder simply returns an array of zeros representing a blank frequency spectrum
+        return new double[audioData.length / 2];
+    }
+
     // Define the RecordingCallback interface
     public interface RecordingCallback {
         void onAudioDataReceived(short[] audioBuffer);
         void onBaselineRecorded(float[] baselineValues);
         void onSNRCalculated(double snrValue);
+    }
+
+    // TestingCallback interface for microphone testing
+    public interface TestingCallback {
+        void onTestingDataReceived(short[] audioBuffer);
+        void onTestCompleted(double amplitude, double[] frequencySpectrum);
     }
 }
