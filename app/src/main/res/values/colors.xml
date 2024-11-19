@@ -1,10 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Light theme colors -->
+    <color name="feedback_background">#FFC0CB</color>
     <color name="colorPrimary">#6200EE</color>
     <color name="colorPrimaryVariant">#3700B3</color>
     <color name="colorOnPrimary">#FFFFFF</color>
+
+    <!-- Secondary colors -->
     <color name="colorSecondary">#03DAC6</color>
+    <color name="colorSecondaryVariant">#018786</color>
     <color name="colorOnSecondary">#000000</color>
+
+    <!-- Custom colors for SNRBar -->
+    <color name="snrbar_start_color">#FF0000</color> <!-- Red -->
+    <color name="snrbar_end_color">#00FF00</color> <!-- Green -->
+    <color name="max_snr_color">#FFA500</color> <!-- Orange -->
+    <color name="snrbar_text_color">#FFFFFF</color> <!-- White -->
     <!-- Other colors -->
 </resources>

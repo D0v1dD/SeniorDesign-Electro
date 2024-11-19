@@ -37,8 +37,6 @@ public class MainActivity extends AppCompatActivity {
 
     private long lastGraphUpdateTime = 0;  // Last update time for graph
     private static final int GRAPH_UPDATE_INTERVAL = 100;  // Update interval for graph (milliseconds)
-
-    private float[] baselineNoiseValues;  // Store baseline noise values
     private boolean isRecordingBaseline = false; // Flag to track if baseline recording is in progress
 
     private Button recordBaselineButton;
@@ -99,14 +97,14 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onBaselineRecorded(float[] baselineValues) {
-                baselineNoiseValues = baselineValues;
-                runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "Baseline recorded successfully.", Toast.LENGTH_SHORT).show();
-                    // Enable the start recording button after baseline is recorded
-                    startRecordButton.setEnabled(true);
-                });
-            }
+            public void onBaselineRecorded() {
+            runOnUiThread(() -> {
+            Toast.makeText(MainActivity.this, "Baseline recorded successfully.", Toast.LENGTH_SHORT).show();
+        // Enable the start recording button after baseline is recorded
+        startRecordButton.setEnabled(true);
+    });
+}
+
 
             @Override
             public void onSNRCalculated(double snrValue) {
@@ -174,31 +172,30 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void startRecording() {
-        if (!permissionToRecordAccepted) {
-            requestRecordAudioPermission();
-            return;
-        }
+private void startRecording() {
+    if (!permissionToRecordAccepted) {
+        requestRecordAudioPermission();
+        return;
+    }
 
-        if (baselineNoiseValues == null) {
+    if (audioProcessor != null) {
+        if (!audioProcessor.isBaselineRecorded()) {
             Toast.makeText(this, "Please record baseline noise first.", Toast.LENGTH_SHORT).show();
             return;
         }
-
-        if (audioProcessor != null) {
-            audioProcessor.setBaseline(baselineNoiseValues);
-            audioProcessor.startRecording();
-            // Update button visibility
-            runOnUiThread(() -> {
-                startRecordButton.setEnabled(false);
-                recordBaselineButton.setEnabled(false);
-                stopRecordButton.setVisibility(Button.VISIBLE);
-                stopRecordButton.setEnabled(true);
-            });
-        } else {
-            Toast.makeText(this, "Audio Processor is not initialized.", Toast.LENGTH_SHORT).show();
-        }
+        audioProcessor.startRecording();
+        // Update button visibility
+        runOnUiThread(() -> {
+            startRecordButton.setEnabled(false);
+            recordBaselineButton.setEnabled(false);
+            stopRecordButton.setVisibility(Button.VISIBLE);
+            stopRecordButton.setEnabled(true);
+        });
+    } else {
+        Toast.makeText(this, "Audio Processor is not initialized.", Toast.LENGTH_SHORT).show();
     }
+}
+
 
     private void stopRecording() {
         if (audioProcessor != null) {

@@ -23,10 +23,15 @@
     <uses-permission
         android:name="android.permission.READ_MEDIA_AUDIO" />
 
-    <!-- Modify audio settings (optional, based on your app’s needs) -->
+    <!-- Modify audio settings -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
-    <!-- Ensure backup and restore configurations -->
+    <!-- Add microphone hardware feature requirement -->
+    <uses-feature android:name="android.hardware.microphone" android:required="true" />
+
+    <!-- Optional: Declare usage of unprocessed audio if available -->
+    <uses-feature android:name="android.hardware.audio.pro" android:required="false" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -48,5 +53,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Optional: Declare other activities or services if needed -->
+
     </application>
 </manifest>

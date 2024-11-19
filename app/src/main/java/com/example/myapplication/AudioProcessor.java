@@ -6,6 +6,7 @@ import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
+import android.os.Build;
 import android.util.Log;
 
 import androidx.core.content.ContextCompat;
@@ -15,7 +16,6 @@ import java.util.Arrays;
 public class AudioProcessor {
     private static final String TAG = "AudioProcessor";
 
-    // Made SAMPLE_RATE public to allow external classes to access it (e.g., MicrophoneTestFragment)
     public static final int SAMPLE_RATE = 44100; // Hz
     private static final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
     private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
@@ -23,26 +23,35 @@ public class AudioProcessor {
 
     private AudioRecord audioRecord;
     private boolean isRecording;
-    private float[] baselineNoiseValues;
+    private double[] baselineNoiseValues;
+    private double baselineNoisePower = 0;
     private RecordingCallback recordingCallback;
     private TestingCallback testingCallback;
     private Context context;
 
-    // Constructor accepting a RecordingCallback as a parameter
     public AudioProcessor(Context context, RecordingCallback recordingCallback) {
         this.context = context;
         this.recordingCallback = recordingCallback;
+    }
 
+    // Initialize AudioRecord with the appropriate audio source
+    private boolean initializeAudioRecord() {
         if (BUFFER_SIZE == AudioRecord.ERROR || BUFFER_SIZE == AudioRecord.ERROR_BAD_VALUE) {
             Log.e(TAG, "Invalid buffer size: " + BUFFER_SIZE);
-            return; // Handle invalid buffer size appropriately
+            return false;
         }
 
-        // Check if permission is granted before initializing AudioRecord
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            int audioSource;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                audioSource = MediaRecorder.AudioSource.UNPROCESSED;
+            } else {
+                audioSource = MediaRecorder.AudioSource.MIC;
+            }
+
             try {
                 audioRecord = new AudioRecord(
-                        MediaRecorder.AudioSource.MIC,
+                        audioSource,
                         SAMPLE_RATE,
                         CHANNEL_CONFIG,
                         AUDIO_FORMAT,
@@ -51,20 +60,24 @@ public class AudioProcessor {
 
                 if (audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
                     Log.e(TAG, "AudioRecord initialization failed. Check the parameters.");
-                    audioRecord = null; // Set to null to prevent issues later
+                    audioRecord.release();
+                    audioRecord = null;
+                    return false;
                 }
+                return true;
             } catch (IllegalArgumentException e) {
                 Log.e(TAG, "Invalid AudioRecord parameters", e);
-                audioRecord = null; // Set to null to handle errors gracefully
+                audioRecord = null;
+                return false;
             }
         } else {
             Log.e(TAG, "RECORD_AUDIO permission not granted.");
+            return false;
         }
     }
 
-    // Recording methods (existing functionality)
     public void recordBaseline() {
-        if (!isAudioRecordInitialized()) {
+        if (!initializeAudioRecord()) {
             return;
         }
 
@@ -73,32 +86,40 @@ public class AudioProcessor {
     }
 
     private void processBaseline() {
-        short[] audioBuffer = new short[BUFFER_SIZE];
-        baselineNoiseValues = new float[BUFFER_SIZE];
-
         if (audioRecord != null) {
             audioRecord.startRecording();
-            while (isRecording) {
-                int readBytes = audioRecord.read(audioBuffer, 0, BUFFER_SIZE);
-                Log.d(TAG, "Bytes read for baseline: " + readBytes);
+            int totalReadSamples = 0;
+            int totalDesiredSamples = SAMPLE_RATE * 2; // Record for 2 seconds
+            short[] totalAudioBuffer = new short[totalDesiredSamples];
 
-                if (readBytes > 0) {
-                    for (int i = 0; i < readBytes; i++) {
-                        baselineNoiseValues[i] = audioBuffer[i] / 32768.0f; // Normalize 16-bit PCM data
-                    }
-                    Log.d(TAG, "Baseline data recorded successfully.");
+            while (isRecording && totalReadSamples < totalDesiredSamples) {
+                short[] audioBuffer = new short[BUFFER_SIZE];
+                int readSamples = audioRecord.read(audioBuffer, 0, BUFFER_SIZE);
 
-                    // Stop after recording one buffer of baseline
-                    isRecording = false;
+                if (readSamples > 0) {
+                    int samplesToCopy = Math.min(readSamples, totalDesiredSamples - totalReadSamples);
+                    System.arraycopy(audioBuffer, 0, totalAudioBuffer, totalReadSamples, samplesToCopy);
+                    totalReadSamples += samplesToCopy;
                 } else {
                     Log.e(TAG, "Failed to read audio data for baseline.");
                 }
             }
-            audioRecord.stop();
+            isRecording = false;
+            stopAudioRecord();
 
-            // Notify MainActivity (recordingCallback) that baseline recording is complete
+            // Convert to double[] and normalize
+            baselineNoiseValues = new double[totalReadSamples];
+            for (int i = 0; i < totalReadSamples; i++) {
+                baselineNoiseValues[i] = totalAudioBuffer[i] / 32768.0; // Normalize to [-1,1]
+            }
+
+            // Calculate baseline noise power
+            baselineNoisePower = calculatePower(baselineNoiseValues);
+            Log.d(TAG, "Baseline noise power: " + baselineNoisePower);
+
+            // Notify that baseline recording is complete
             if (recordingCallback != null) {
-                recordingCallback.onBaselineRecorded(baselineNoiseValues);
+                recordingCallback.onBaselineRecorded();
             }
         } else {
             Log.e(TAG, "AudioRecord object is null.");
@@ -112,17 +133,13 @@ public class AudioProcessor {
         }
     }
 
-    public void setBaseline(float[] baselineValues) {
-        this.baselineNoiseValues = baselineValues;
-    }
-
     public void startRecording() {
-        if (!isAudioRecordInitialized()) {
+        if (!initializeAudioRecord()) {
             return;
         }
 
-        if (baselineNoiseValues == null || baselineNoiseValues.length == 0) {
-            Log.e(TAG, "Baseline noise values are not set.");
+        if (baselineNoisePower == 0) {
+            Log.e(TAG, "Baseline noise power is zero or not set.");
             return;
         }
 
@@ -131,30 +148,27 @@ public class AudioProcessor {
     }
 
     private void processRecording() {
-        short[] audioBuffer = new short[BUFFER_SIZE];
-
         if (audioRecord != null) {
             audioRecord.startRecording();
+            short[] audioBuffer = new short[BUFFER_SIZE];
 
             while (isRecording) {
-                int readBytes = audioRecord.read(audioBuffer, 0, BUFFER_SIZE);
-                if (readBytes > 0) {
-                    // Trim the buffer to the number of bytes read
-                    short[] trimmedBuffer = Arrays.copyOf(audioBuffer, readBytes);
+                int readSamples = audioRecord.read(audioBuffer, 0, BUFFER_SIZE);
+                if (readSamples > 0) {
+                    short[] trimmedBuffer = Arrays.copyOf(audioBuffer, readSamples);
 
-                    // Callback to notify new audio data
                     if (recordingCallback != null) {
                         recordingCallback.onAudioDataReceived(trimmedBuffer);
 
                         // Calculate SNR
-                        double snrValue = calculateSNR(trimmedBuffer, baselineNoiseValues);
+                        double snrValue = calculateSNR(trimmedBuffer);
                         recordingCallback.onSNRCalculated(snrValue);
                     }
                 } else {
                     Log.e(TAG, "Failed to read audio data.");
                 }
             }
-            audioRecord.stop();
+            stopAudioRecord();
         } else {
             Log.e(TAG, "AudioRecord object is null.");
         }
@@ -167,14 +181,17 @@ public class AudioProcessor {
         }
     }
 
-    // Microphone Testing Methods (new functionality)
+    public boolean isBaselineRecorded() {
+        return baselineNoisePower > 0;
+    }
+
+    // *** Added testMicrophone Method ***
     public void testMicrophone(TestingCallback testingCallback) {
-        if (!isAudioRecordInitialized()) {
+        if (!initializeAudioRecord()) {
             return;
         }
 
         this.testingCallback = testingCallback;
-        short[] audioBuffer = new short[BUFFER_SIZE];
         isRecording = true;
 
         new Thread(() -> {
@@ -184,24 +201,34 @@ public class AudioProcessor {
             }
 
             audioRecord.startRecording();
-            long recordingStart = System.currentTimeMillis();
-            long testDuration = 3000; // Record for 3 seconds
+            int totalReadSamples = 0;
+            int totalDesiredSamples = SAMPLE_RATE * 3; // Record for 3 seconds
+            short[] totalAudioBuffer = new short[totalDesiredSamples];
 
-            while (isRecording && System.currentTimeMillis() - recordingStart < testDuration) {
-                int readBytes = audioRecord.read(audioBuffer, 0, BUFFER_SIZE);
-                if (readBytes > 0 && testingCallback != null) {
-                    short[] trimmedBuffer = Arrays.copyOf(audioBuffer, readBytes);
-                    testingCallback.onTestingDataReceived(trimmedBuffer);
+            while (isRecording && totalReadSamples < totalDesiredSamples) {
+                short[] audioBuffer = new short[BUFFER_SIZE];
+                int readSamples = audioRecord.read(audioBuffer, 0, BUFFER_SIZE);
+
+                if (readSamples > 0) {
+                    int samplesToCopy = Math.min(readSamples, totalDesiredSamples - totalReadSamples);
+                    System.arraycopy(audioBuffer, 0, totalAudioBuffer, totalReadSamples, samplesToCopy);
+                    totalReadSamples += samplesToCopy;
+
+                    // Callback to notify new audio data
+                    if (testingCallback != null) {
+                        short[] trimmedBuffer = Arrays.copyOf(audioBuffer, readSamples);
+                        testingCallback.onTestingDataReceived(trimmedBuffer);
+                    }
+                } else {
+                    Log.e(TAG, "Failed to read audio data.");
                 }
             }
-
-            if (isRecording) {
-                stopAudioRecord();
-            }
+            isRecording = false;
+            stopAudioRecord();
 
             // Analyze audio after recording
-            double amplitude = calculateAmplitude(audioBuffer);
-            double[] frequencySpectrum = calculateFrequencySpectrum(audioBuffer);
+            double amplitude = calculateAmplitude(totalAudioBuffer);
+            double[] frequencySpectrum = calculateFrequencySpectrum(totalAudioBuffer);
 
             if (testingCallback != null) {
                 testingCallback.onTestCompleted(amplitude, frequencySpectrum);
@@ -221,51 +248,38 @@ public class AudioProcessor {
     private void stopAudioRecord() {
         if (audioRecord != null) {
             try {
-                audioRecord.stop();
+                if (audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
+                    audioRecord.stop();
+                }
             } catch (IllegalStateException e) {
                 Log.e(TAG, "Error stopping AudioRecord", e);
+            } finally {
+                audioRecord.release();
+                audioRecord = null;
             }
         }
     }
 
-    private boolean isAudioRecordInitialized() {
-        if (audioRecord == null || audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
-            Log.e(TAG, "AudioRecord not properly initialized");
-            return false;
-        }
-        return true;
-    }
-
-    private double calculateSNR(short[] signalBuffer, float[] noiseBuffer) {
-        // Convert short[] to double[] for signal
+    private double calculateSNR(short[] signalBuffer) {
         double[] signal = new double[signalBuffer.length];
         for (int i = 0; i < signalBuffer.length; i++) {
             signal[i] = signalBuffer[i] / 32768.0; // Normalize to [-1,1]
         }
 
-        // Ensure noiseBuffer and signalBuffer are the same length
-        double[] noise = new double[signalBuffer.length];
-        if (noiseBuffer.length >= signalBuffer.length) {
-            for (int i = 0; i < signalBuffer.length; i++) {
-                noise[i] = noiseBuffer[i];
-            }
-        } else {
-            // If noiseBuffer is shorter, repeat it to match the signal length
-            int repeats = signalBuffer.length / noiseBuffer.length;
-            for (int i = 0; i < signalBuffer.length; i++) {
-                noise[i] = noiseBuffer[i % noiseBuffer.length];
-            }
-        }
-
-        // Calculate power of signal and noise
         double signalPower = calculatePower(signal);
-        double noisePower = calculatePower(noise);
 
-        if (noisePower == 0) {
-            return 0; // Avoid division by zero
+        if (baselineNoisePower == 0) {
+            Log.e(TAG, "Baseline noise power is zero, cannot calculate SNR");
+            return 0;
         }
 
-        double snr = 10 * Math.log10(signalPower / noisePower);
+        double snr = 10 * Math.log10(signalPower / baselineNoisePower);
+
+        // Log values for debugging
+        Log.d(TAG, "Signal Power: " + signalPower);
+        Log.d(TAG, "Baseline Noise Power: " + baselineNoisePower);
+        Log.d(TAG, "Calculated SNR: " + snr);
+
         return snr;
     }
 
@@ -292,26 +306,23 @@ public class AudioProcessor {
             audioDataDouble[i] = audioBuffer[i] / 32768.0; // Normalize
         }
 
-        // Perform FFT and return frequency spectrum
-        double[] frequencySpectrum = fft(audioDataDouble);
-        return frequencySpectrum;
-    }
+        // Implement FFT or use a library
+        // Placeholder for FFT calculation
+        double[] frequencySpectrum = new double[audioDataDouble.length / 2];
 
-    // Placeholder FFT implementation (to be replaced with an actual FFT algorithm or library)
-    private double[] fft(double[] audioData) {
-        // TODO: Implement FFT calculation or use an FFT library (e.g., JTransform)
-        // This placeholder simply returns an array of zeros representing a blank frequency spectrum
-        return new double[audioData.length / 2];
+        // TODO: Implement FFT and fill frequencySpectrum array
+
+        return frequencySpectrum;
     }
 
     // Define the RecordingCallback interface
     public interface RecordingCallback {
         void onAudioDataReceived(short[] audioBuffer);
-        void onBaselineRecorded(float[] baselineValues);
+        void onBaselineRecorded();
         void onSNRCalculated(double snrValue);
     }
 
-    // TestingCallback interface for microphone testing
+    // Define the TestingCallback interface
     public interface TestingCallback {
         void onTestingDataReceived(short[] audioBuffer);
         void onTestCompleted(double amplitude, double[] frequencySpectrum);

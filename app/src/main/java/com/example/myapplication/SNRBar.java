@@ -30,18 +30,18 @@ public class SNRBar extends View {
         snrPaint = new Paint();
 
         maxSNRPaint = new Paint();
-        maxSNRPaint.setColor(ContextCompat.getColor(context, android.R.color.holo_orange_dark));
+        maxSNRPaint.setColor(ContextCompat.getColor(context, R.color.max_snr_color));
         maxSNRPaint.setStrokeWidth(5f);
         maxSNRPaint.setStyle(Paint.Style.STROKE);
 
         textPaint = new Paint();
-        textPaint.setColor(ContextCompat.getColor(context, android.R.color.primary_text_light));
+        textPaint.setColor(ContextCompat.getColor(context, R.color.snrbar_text_color));
         textPaint.setTextSize(40f);
         textPaint.setTextAlign(Paint.Align.CENTER);
 
         // Initialize gradient colors from resources or defaults
-        int startColor = ContextCompat.getColor(context, android.R.color.holo_red_dark);
-        int endColor = ContextCompat.getColor(context, android.R.color.holo_green_dark);
+        int startColor = ContextCompat.getColor(context, R.color.snrbar_start_color);
+        int endColor = ContextCompat.getColor(context, R.color.snrbar_end_color);
 
         // Handle custom attributes (if any)
         if (attrs != null) {
@@ -84,8 +84,8 @@ public class SNRBar extends View {
 
         // Recreate gradient with updated height
         gradient = new LinearGradient(0, 0, 0, getHeight(),
-                ContextCompat.getColor(getContext(), android.R.color.holo_red_dark),
-                ContextCompat.getColor(getContext(), android.R.color.holo_green_dark),
+                ContextCompat.getColor(getContext(), R.color.snrbar_start_color),
+                ContextCompat.getColor(getContext(), R.color.snrbar_end_color),
                 Shader.TileMode.CLAMP);
         snrPaint.setShader(gradient);
 
