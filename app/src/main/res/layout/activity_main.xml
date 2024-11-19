@@ -19,61 +19,57 @@
     <!-- Buttons arranged in a vertical LinearLayout -->
     <LinearLayout
         android:id="@+id/button_container"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center_horizontal"
         app:layout_constraintTop_toBottomOf="@id/toolbar"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="16dp">
+        android:layout_marginTop="16dp"
+        android:padding="16dp">
 
         <!-- Record Baseline Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/button_record_baseline"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/record_baseline_noise"
             android:contentDescription="@string/record_baseline_noise_button"
             android:layout_marginBottom="8dp" />
 
-        <!-- FrameLayout to overlap Start and Stop buttons -->
-        <FrameLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content">
+        <!-- Start Recording Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_start_record"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/start_recording"
+            android:contentDescription="@string/start_recording_button"
+            android:enabled="false"
+            android:layout_marginBottom="8dp" />
 
-            <!-- Start Recording Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/button_start_record"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/start_recording"
-                android:contentDescription="@string/start_recording_button"
-                android:enabled="false" />
-
-            <!-- Stop Recording Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/button_stop_record"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/stop_recording"
-                android:contentDescription="@string/stop_recording_button"
-                android:visibility="gone" />
-
-        </FrameLayout>
+        <!-- Stop Recording Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_stop_record"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/stop_recording"
+            android:contentDescription="@string/stop_recording_button"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp" />
 
         <!-- View Saved Files Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/button_view_saved_files"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/view_saved_files"
             android:contentDescription="@string/view_saved_files_button"
-            android:layout_marginTop="8dp" />
+            android:layout_marginBottom="8dp" />
 
     </LinearLayout>
 
@@ -86,8 +82,8 @@
         app:layout_constraintTop_toBottomOf="@id/button_container"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/audio_chart"
-        app:layout_constraintHeight_percent="0.2" />
+        app:layout_constraintHeight_percent="0.2"
+        app:layout_constraintBottom_toTopOf="@id/audio_chart" />
 
     <!-- Audio chart to display real-time audio -->
     <com.github.mikephil.charting.charts.LineChart
